@@ -1,11 +1,13 @@
-export const settings = {
-  academyName: "Skill Forge Academy",
-  academyUrl: process.env.ACADEMY_URL || "https://skillforgeacademy-7xln.onrender.com",
-  groupUrl: process.env.WHATSAPP_GROUP_URL || "https://chat.whatsapp.com/GbG1r1d1VcnKVWQkOwOr1t?s=cl&p=a&mlu=4&ilr=4",
-  directWhatsApp: process.env.BUSINESS_WHATSAPP_URL || "https://wa.me/2349062206231",
-  scholarshipText: "Scholarships of up to 100% may be available for selected cohorts and limited slots. Availability is confirmed per cohort.",
-  humanHandoffHours: Number(process.env.HUMAN_HANDOFF_HOURS || 12),
-};
+export function getSettings(env = {}) {
+  return {
+    academyName: "Skill Forge Academy",
+    academyUrl: env.ACADEMY_URL || "https://skillforgeacademy-7xln.onrender.com",
+    groupUrl: env.WHATSAPP_GROUP_URL || "https://chat.whatsapp.com/GbG1r1d1VcnKVWQkOwOr1t?s=cl&p=a&mlu=4&ilr=4",
+    directWhatsApp: env.BUSINESS_WHATSAPP_URL || "https://wa.me/2349062206231",
+    scholarshipText: "Scholarships of up to 100% may be available for selected cohorts and limited slots. Availability is confirmed per cohort.",
+    humanHandoffHours: Number(env.HUMAN_HANDOFF_HOURS || 12),
+  };
+}
 
 export const courses = [
   {id:"course_forex",title:"Forex Trading",menuTitle:"Forex Trading",aliases:["forex","trading","fx"],pricing:"Beginner $15 | Full Course $50 | VIP / Elite $75",description:"Learn currency-market foundations, market structure, risk management, trading psychology, session timing and disciplined trading plans.",path:"/courses/forex.html"},
@@ -24,11 +26,13 @@ export const services = [
   {id:"service_uiux",title:"UI/UX Design",menuTitle:"UI/UX Design",aliases:["ui","ux","uiux","ui/ux","ui design","ux design","ui/ux design","ui/ux service","figma design","prototype"],price:"Custom quote based on number of screens and project scope.",description:"Wireframes, user flows, high-fidelity interface designs and clickable prototypes for websites and mobile apps."}
 ];
 
-export const portfolio = [
-  {name:"SIWES Connect",url:process.env.SIWES_CONNECT_URL || "https://siwes-connect-gzlj.onrender.com",description:"A SIWES placement platform for students and organizations."},
-  {name:"Merry Gold",url:process.env.MERRY_GOLD_URL || "https://merrygoldstore.online",description:"An e-commerce storefront and admin-managed online store."},
-  {name:"Skill Forge Academy",url:process.env.ACADEMY_URL || "https://skillforgeacademy-7xln.onrender.com",description:"The Skill Forge course catalogue and learning-resource website."}
-];
+export function getPortfolio(env = {}) {
+  return [
+    {name:"SIWES Connect",url:env.SIWES_CONNECT_URL || "https://siwes-connect-gzlj.onrender.com",description:"A SIWES placement platform for students and organizations."},
+    {name:"Merry Gold",url:env.MERRY_GOLD_URL || "https://merrygoldstore.online",description:"An e-commerce storefront and admin-managed online store."},
+    {name:"Skill Forge Academy",url:env.ACADEMY_URL || "https://skillforgeacademy-7xln.onrender.com",description:"The Skill Forge course catalogue and learning-resource website."}
+  ];
+}
 
 export const courseById = (id) => courses.find((course) => course.id === id);
 export const serviceById = (id) => services.find((service) => service.id === id);
