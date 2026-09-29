@@ -1,0 +1,19 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "skillforge-whatsapp-bot",
+  "main": "src/index.js",
+  "compatibility_date": "2026-09-29",
+  "workers_dev": true,
+  "observability": {
+    "enabled": true
+  },
+  "vars": {
+    "META_GRAPH_VERSION": "v21.0",
+    "ACADEMY_URL": "https://skillforgeacademy-7xln.onrender.com",
+    "WHATSAPP_GROUP_URL": "https://chat.whatsapp.com/GbG1r1d1VcnKVWQkOwOr1t?s=cl&p=a&mlu=4&ilr=4",
+    "BUSINESS_WHATSAPP_URL": "https://wa.me/2349062206231",
+    "SIWES_CONNECT_URL": "https://siwes-connect-gzlj.onrender.com",
+    "MERRY_GOLD_URL": "https://merrygoldstore.online",
+    "HUMAN_HANDOFF_HOURS": "12"
+  }
+}
