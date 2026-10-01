@@ -94,7 +94,6 @@ These defaults are already in `wrangler.jsonc`:
 - WhatsApp information group
 - Business WhatsApp URL
 - SIWES Connect portfolio URL
-- Merry Gold portfolio URL
 - Human handoff duration
 - Meta Graph API version
 
