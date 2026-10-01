@@ -8,7 +8,7 @@
     "enabled": true
   },
   "vars": {
-    "META_GRAPH_VERSION": "v21.0",
+    "META_GRAPH_VERSION": "v25.0",
     "ACADEMY_URL": "https://skillforgeacademy-7xln.onrender.com",
     "WHATSAPP_GROUP_URL": "https://chat.whatsapp.com/GbG1r1d1VcnKVWQkOwOr1t?s=cl&p=a&mlu=4&ilr=4",
     "BUSINESS_WHATSAPP_URL": "https://wa.me/2349062206231",
