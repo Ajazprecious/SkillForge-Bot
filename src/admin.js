@@ -383,26 +383,61 @@ function renderChat(c,messages){
 }
 document.getElementById("backBtn").onclick=function(){document.getElementById("mainPane").classList.remove("mobile-open");};
 
-async function action(path,body){
-  if(!state.selected)return;
+async function action(path,body,button,workingLabel){
+  if(!state.selected)return false;
   body=body||{};
+
+  var oldLabel=button?button.textContent:"";
+  if(button){
+    button.disabled=true;
+    if(workingLabel)button.textContent=workingLabel;
+  }
+
   try{
-    await api("/api/admin/conversations/"+encodeURIComponent(state.selected.phone)+path,{method:"POST",body:JSON.stringify(body)});
+    await api("/api/admin/conversations/"+encodeURIComponent(state.selected.phone)+path,{
+      method:"POST",
+      body:JSON.stringify(body)
+    });
     await openConversation(state.selected.phone);
-  }catch(error){alert(error.message);}
+    return true;
+  }catch(error){
+    alert(error.message||"Action failed.");
+    return false;
+  }finally{
+    if(button){
+      button.disabled=false;
+      button.textContent=oldLabel;
+    }
+  }
 }
-document.getElementById("assignBtn").onclick=function(){action("/assign");};
-document.getElementById("takeoverBtn").onclick=function(){action("/takeover");};
-document.getElementById("returnBotBtn").onclick=function(){action("/return-to-bot");};
-document.getElementById("closeBtn").onclick=function(){if(confirm("Close this conversation and return it to bot mode?"))action("/close");};
+
+document.getElementById("assignBtn").onclick=async function(){
+  await action("/assign",{},this,"Assigning...");
+};
+document.getElementById("takeoverBtn").onclick=async function(){
+  await action("/takeover",{},this,"Taking over...");
+};
+document.getElementById("returnBotBtn").onclick=async function(){
+  await action("/return-to-bot",{},this,"Returning...");
+};
+document.getElementById("closeBtn").onclick=async function(){
+  if(confirm("Close this conversation and return it to bot mode?")){
+    await action("/close",{},this,"Closing...");
+  }
+};
 document.getElementById("replyForm").addEventListener("submit",async function(e){
   e.preventDefault();
   if(!state.selected)return;
   var textarea=document.getElementById("replyText");
+  var sendButton=this.querySelector('button[type="submit"]');
   var text=textarea.value.trim();
   if(!text)return;
+
   textarea.disabled=true;
-  try{await action("/reply",{text:text});textarea.value="";}finally{textarea.disabled=false;textarea.focus();}
+  var ok=await action("/reply",{text:text},sendButton,"Sending...");
+  if(ok)textarea.value="";
+  textarea.disabled=false;
+  textarea.focus();
 });
 boot();
 </script>
