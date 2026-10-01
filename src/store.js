@@ -39,12 +39,18 @@ export async function claimMessage(env,messageId,payload={}){
 }
 
 export async function getSession(env,phone){
+  const memory=memorySessions.get(phone);
+  if(memory) return memory;
+
   if(env?.BOT_STATE){
     const saved=await env.BOT_STATE.get(sessionKey(phone),{type:"json"});
-    if(saved) return saved;
+    if(saved){
+      memorySessions.set(phone,saved);
+      return saved;
+    }
   }
 
-  return memorySessions.get(phone) || {
+  return {
     phone,
     optedOut:false,
     humanHandoffUntil:null,
