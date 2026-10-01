@@ -11,7 +11,8 @@ The bot no longer needs Express, MongoDB, a long-running Node server, or Render.
 - Scholarships and registration information
 - Website, mobile app, graphics/photo, video and UI/UX service enquiries
 - Project/portfolio links
-- Human handoff mode
+- Structured service quote requests with Cloudflare KV storage
+- Human support handoff with saved support requests
 - STOP/unsubscribe and START BOT/resume
 - Duplicate-message protection
 - Meta webhook signature verification
@@ -148,9 +149,25 @@ Portfolio
 Human
 ```
 
-## Human handoff
+## Quote requests and human support
 
-When a customer chooses **Speak to a Person**, asks for a quote, or types words such as `human`, `agent`, or `customer care`, the bot pauses automated replies for the configured handoff period.
+**Request quote** and **Human support** are now separate workflows.
+
+When a customer requests a quote, the bot collects:
+
+1. Full name
+2. Service needed
+3. Project description
+4. Budget range
+5. Preferred completion date / timeline
+
+If the customer starts the quote from a specific service card, that service is preselected automatically.
+
+Completed quote requests receive a reference beginning with `SFQ-` and are stored in the `BOT_STATE` KV namespace for up to 180 days.
+
+Human support asks the customer to briefly explain what they need help with before handing the conversation over. Support requests receive a reference beginning with `SFS-` and are also stored in KV.
+
+After either workflow is completed, the automated bot pauses for the configured handoff period so a Skill Forge representative can reply manually.
 
 The customer can type:
 
@@ -158,7 +175,13 @@ The customer can type:
 MENU
 ```
 
-to reactivate the bot immediately.
+at any time to reactivate the bot. During a quote/support form, they can type:
+
+```text
+CANCEL
+```
+
+to cancel the request.
 
 ## Local development
 
