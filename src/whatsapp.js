@@ -1,3 +1,5 @@
+import { recordConversationMessage } from "./store.js";
+
 function assertConfigured(env) {
   if (!env?.WHATSAPP_ACCESS_TOKEN || !env?.WHATSAPP_PHONE_NUMBER_ID) {
     throw new Error("WhatsApp API is not configured. Add WHATSAPP_ACCESS_TOKEN and WHATSAPP_PHONE_NUMBER_ID as Worker secrets.");
@@ -6,7 +8,7 @@ function assertConfigured(env) {
 
 async function apiRequest(env, payload) {
   assertConfigured(env);
-  const apiVersion = env.META_GRAPH_VERSION || "v21.0";
+  const apiVersion = env.META_GRAPH_VERSION || "v25.0";
   const response = await fetch(`https://graph.facebook.com/${apiVersion}/${env.WHATSAPP_PHONE_NUMBER_ID}/messages`, {
     method:"POST",
     headers:{
@@ -26,12 +28,39 @@ async function apiRequest(env, payload) {
   return data;
 }
 
-export async function sendText(env, to, body, {previewUrl=false}={}) {
-  return apiRequest(env,{recipient_type:"individual",to,type:"text",text:{body:body.slice(0,4096),preview_url:previewUrl}});
+async function logOutbound(env,to,text,{source="bot",adminName=null,messageType="text"}={}){
+  try{
+    await recordConversationMessage(env,{
+      phone:to,
+      direction:"out",
+      source,
+      adminName,
+      messageType,
+      text
+    });
+  } catch(error){
+    console.warn("Could not save outbound conversation message:",error?.message || error);
+  }
+}
+
+export async function sendText(env, to, body, {
+  previewUrl=false,
+  source="bot",
+  adminName=null
+}={}) {
+  const result=await apiRequest(env,{
+    recipient_type:"individual",
+    to,
+    type:"text",
+    text:{body:body.slice(0,4096),preview_url:previewUrl}
+  });
+
+  await logOutbound(env,to,body,{source,adminName,messageType:"text"});
+  return result;
 }
 
 export async function sendReplyButtons(env, to, body, buttons) {
-  return apiRequest(env,{
+  const result=await apiRequest(env,{
     recipient_type:"individual",
     to,
     type:"interactive",
@@ -46,10 +75,13 @@ export async function sendReplyButtons(env, to, body, buttons) {
       }
     }
   });
+
+  await logOutbound(env,to,body,{source:"bot",messageType:"interactive_button"});
+  return result;
 }
 
 export async function sendList(env, to,{header,body,button,sections}) {
-  return apiRequest(env,{
+  const result=await apiRequest(env,{
     recipient_type:"individual",
     to,
     type:"interactive",
@@ -70,6 +102,12 @@ export async function sendList(env, to,{header,body,button,sections}) {
       }
     }
   });
+
+  await logOutbound(env,to,`${header ? header+"\n\n" : ""}${body}`,{
+    source:"bot",
+    messageType:"interactive_list"
+  });
+  return result;
 }
 
 export async function markAsRead(env, messageId) {
