@@ -14,5 +14,11 @@
     "BUSINESS_WHATSAPP_URL": "https://wa.me/2349062206231",
     "SIWES_CONNECT_URL": "https://siwes-connect-gzlj.onrender.com",
     "HUMAN_HANDOFF_HOURS": "12"
-  }
+  },
+  "kv_namespaces": [
+    {
+      "binding": "BOT_STATE",
+      "id": "59173deb87004d02919438bbca40dcbf"
+    }
+  ]
 }
