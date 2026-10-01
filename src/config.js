@@ -29,7 +29,6 @@ export const services = [
 export function getPortfolio(env = {}) {
   return [
     {name:"SIWES Connect",url:env.SIWES_CONNECT_URL || "https://siwes-connect-gzlj.onrender.com",description:"A SIWES placement platform for students and organizations."},
-    {name:"Merry Gold",url:env.MERRY_GOLD_URL || "https://merrygoldstore.online",description:"An e-commerce storefront and admin-managed online store."},
     {name:"Skill Forge Academy",url:env.ACADEMY_URL || "https://skillforgeacademy-7xln.onrender.com",description:"The Skill Forge course catalogue and learning-resource website."}
   ];
 }
