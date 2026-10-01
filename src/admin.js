@@ -92,7 +92,11 @@ export async function createAdminSession(env,username,password){
 export async function getAdminFromRequest(request,env){
   if(!env.ADMIN_SESSION_SECRET) return null;
 
-  const token=parseCookies(request).sf_admin_session;
+  const auth=request.headers.get("authorization") || "";
+  const bearer=auth.toLowerCase().startsWith("bearer ")
+    ? auth.slice(7).trim()
+    : "";
+  const token=bearer || parseCookies(request).sf_admin_session;
   if(!token) return null;
 
   const parts=token.split(".");
@@ -115,7 +119,7 @@ export async function getAdminFromRequest(request,env){
 }
 
 export function adminSessionCookie(token){
-  return "sf_admin_session="+encodeURIComponent(token)+"; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=43200";
+  return "sf_admin_session="+encodeURIComponent(token)+"; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=43200";
 }
 
 export function clearAdminSessionCookie(){
@@ -194,7 +198,7 @@ input,textarea{width:100%;border:1px solid #d1d5db;border-radius:10px;padding:11
 </div>
 
 <script>
-var state={admin:null,conversations:[],selected:null,filter:"all",poll:null};
+var state={admin:null,token:sessionStorage.getItem("sf_admin_token")||"",conversations:[],selected:null,filter:"all",poll:null};
 
 function esc(value){
   return String(value==null?"":value).replace(/[&<>"']/g,function(c){
@@ -211,9 +215,21 @@ function formatTime(value){
 }
 async function api(path,options){
   options=options||{};
-  var response=await fetch(path,Object.assign({},options,{headers:Object.assign({"content-type":"application/json"},options.headers||{})}));
+  var headers=Object.assign({"content-type":"application/json"},options.headers||{});
+  if(state.token)headers.authorization="Bearer "+state.token;
+
+  var response=await fetch(path,Object.assign({},options,{
+    credentials:"same-origin",
+    headers:headers
+  }));
+
   var data=await response.json().catch(function(){return {};});
-  if(response.status===401){showLogin();throw new Error("Session expired");}
+  if(response.status===401){
+    state.token="";
+    sessionStorage.removeItem("sf_admin_token");
+    showLogin();
+    throw new Error("Session expired");
+  }
   if(!response.ok)throw new Error(data.error||"Request failed");
   return data;
 }
@@ -268,6 +284,8 @@ document.getElementById("loginForm").addEventListener("submit",async function(e)
     });
 
     state.admin=result.username;
+    state.token=result.token||"";
+    if(state.token)sessionStorage.setItem("sf_admin_token",state.token);
     showApp();
     await loadConversations();
 
@@ -280,7 +298,12 @@ document.getElementById("loginForm").addEventListener("submit",async function(e)
     button.textContent="Sign in";
   }
 });
-document.getElementById("logoutBtn").onclick=async function(){await fetch("/api/admin/logout",{method:"POST"});location.reload();};
+document.getElementById("logoutBtn").onclick=async function(){
+  state.token="";
+  sessionStorage.removeItem("sf_admin_token");
+  await fetch("/api/admin/logout",{method:"POST",credentials:"same-origin"});
+  location.reload();
+};
 document.querySelectorAll(".filter").forEach(function(button){button.onclick=function(){state.filter=button.dataset.filter;document.querySelectorAll(".filter").forEach(function(b){b.classList.toggle("active",b===button);});renderConversations();};});
 document.getElementById("searchBox").oninput=renderConversations;
 
