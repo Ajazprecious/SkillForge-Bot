@@ -411,6 +411,14 @@ export default {
       });
     }
 
+    if(url.pathname==="/api/admin/status" && request.method==="GET"){
+      return json({
+        ok:true,
+        adminConfigured:adminConfigured(env),
+        kvBound:Boolean(env.BOT_STATE)
+      });
+    }
+
     if(url.pathname==="/admin" && request.method==="GET"){
       return new Response(adminPage(),{
         headers:{
