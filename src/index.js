@@ -295,9 +295,12 @@ async function handleAdminApi(request,env,url){
   }
 
   if(action==="takeover"){
+    const handoffHours=Number(env.HUMAN_HANDOFF_HOURS || 12);
+    const handoffUntil=new Date(Date.now()+handoffHours*60*60*1000).toISOString();
+
     await updateSession(env,phone,{
       botMode:"human",
-      humanHandoffUntil:null
+      humanHandoffUntil:handoffUntil
     });
 
     const conversation=await setConversationState(env,phone,{
@@ -354,9 +357,12 @@ async function handleAdminApi(request,env,url){
     if(!text) return json({error:"Reply text is required."},400);
     if(text.length>4000) return json({error:"Reply is too long."},400);
 
+    const handoffHours=Number(env.HUMAN_HANDOFF_HOURS || 12);
+    const handoffUntil=new Date(Date.now()+handoffHours*60*60*1000).toISOString();
+
     await updateSession(env,phone,{
       botMode:"human",
-      humanHandoffUntil:null
+      humanHandoffUntil:handoffUntil
     });
 
     await setConversationState(env,phone,{
