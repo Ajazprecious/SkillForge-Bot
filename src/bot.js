@@ -539,9 +539,17 @@ export async function handleIncoming(env,{from,profileName,message}){
     if(RESUME_WORDS.has(text)){
       await updateSession(env,from,{
         optedOut:false,
+        botMode:"bot",
+        humanHandoffUntil:null,
         quoteDraft:null,
         supportDraft:null,
         lastIntent:"menu"
+      });
+      await setConversationState(env,from,{
+        status:"open",
+        botMode:"bot",
+        needsHuman:false,
+        assignedAdmin:null
       });
       await sendText(env,from,"Automated replies are active again ✅");
       await safeMenu(env,from);
@@ -552,9 +560,17 @@ export async function handleIncoming(env,{from,profileName,message}){
   if(MENU_WORDS.has(text)){
     await updateSession(env,from,{
       humanHandoffUntil:null,
+      botMode:"bot",
       quoteDraft:null,
       supportDraft:null,
       lastIntent:"menu"
+    });
+    await setConversationState(env,from,{
+      status:"open",
+      botMode:"bot",
+      needsHuman:false,
+      assignedAdmin:null,
+      unreadCount:0
     });
     await safeMenu(env,from);
     return;
