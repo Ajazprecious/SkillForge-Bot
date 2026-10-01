@@ -577,7 +577,24 @@ export async function handleIncoming(env,{from,profileName,message}){
   }
 
   if(session.botMode==="human"){
-    return;
+    const handoffEnds=session.humanHandoffUntil
+      ? new Date(session.humanHandoffUntil).getTime()
+      : 0;
+
+    if(handoffEnds>Date.now()){
+      return;
+    }
+
+    await updateSession(env,from,{
+      botMode:"bot",
+      humanHandoffUntil:null
+    });
+    await setConversationState(env,from,{
+      botMode:"bot",
+      needsHuman:false,
+      assignedAdmin:null
+    });
+    session=await getSession(env,from);
   }
 
   if(session.humanHandoffUntil && new Date(session.humanHandoffUntil).getTime()>Date.now()){
