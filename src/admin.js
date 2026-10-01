@@ -54,8 +54,12 @@ function getAdminUsers(env){
     }
   }
 
+  if(env.ADMIN_USERNAME && env.ADMIN_PASSWORD){
+    return {[String(env.ADMIN_USERNAME)]:String(env.ADMIN_PASSWORD)};
+  }
+
   if(env.ADMIN_PASSWORD){
-    return {admin:env.ADMIN_PASSWORD};
+    return {admin:String(env.ADMIN_PASSWORD)};
   }
 
   return {};
@@ -158,7 +162,8 @@ input,textarea{width:100%;border:1px solid #d1d5db;border-radius:10px;padding:11
 <p>Admin inbox for WhatsApp customer conversations.</p>
 <label>Username</label><input id="loginUsername" autocomplete="username" required>
 <label>Password</label><input id="loginPassword" type="password" autocomplete="current-password" required>
-<button class="btn btn-primary" type="submit">Sign in</button>
+<button class="btn btn-primary" id="loginBtn" type="submit">Sign in</button>
+<div id="loginStatus" style="font-size:12px;color:#6b7280;margin-top:12px"></div>
 <div id="loginError" class="error"></div>
 </form>
 </div>
@@ -211,21 +216,65 @@ async function api(path,options){
 function showLogin(){document.getElementById("loginView").classList.remove("hidden");document.getElementById("appView").classList.add("hidden");}
 function showApp(){document.getElementById("loginView").classList.add("hidden");document.getElementById("appView").classList.remove("hidden");document.getElementById("adminName").textContent=state.admin;}
 async function boot(){
+  showLogin();
+
+  try{
+    var status=await fetch("/api/admin/status",{cache:"no-store"}).then(function(r){return r.json();});
+    var statusEl=document.getElementById("loginStatus");
+    if(!status.adminConfigured){
+      statusEl.textContent="Admin login is not configured yet in Cloudflare.";
+      statusEl.style.color="#b42318";
+    }else if(!status.kvBound){
+      statusEl.textContent="Admin login is configured, but BOT_STATE KV is not connected.";
+      statusEl.style.color="#b45309";
+    }else{
+      statusEl.textContent="Admin login is ready.";
+      statusEl.style.color="#067647";
+    }
+  }catch(e){
+    document.getElementById("loginStatus").textContent="Could not check admin configuration.";
+  }
+
   try{
     var me=await api("/api/admin/me");
     state.admin=me.username;showApp();await loadConversations();state.poll=setInterval(loadConversations,5000);
-  }catch(e){showLogin();}
+  }catch(e){}
 }
 
 document.getElementById("loginForm").addEventListener("submit",async function(e){
   e.preventDefault();
   var username=document.getElementById("loginUsername").value.trim();
   var password=document.getElementById("loginPassword").value;
-  document.getElementById("loginError").textContent="";
+  var errorEl=document.getElementById("loginError");
+  var button=document.getElementById("loginBtn");
+
+  errorEl.textContent="";
+  if(!username || !password){
+    errorEl.textContent="Enter both username and password.";
+    return;
+  }
+
+  button.disabled=true;
+  button.textContent="Signing in...";
+
   try{
-    var result=await api("/api/admin/login",{method:"POST",body:JSON.stringify({username:username,password:password})});
-    state.admin=result.username;showApp();await loadConversations();if(state.poll)clearInterval(state.poll);state.poll=setInterval(loadConversations,5000);
-  }catch(error){document.getElementById("loginError").textContent=error.message;}
+    var result=await api("/api/admin/login",{
+      method:"POST",
+      body:JSON.stringify({username:username,password:password})
+    });
+
+    state.admin=result.username;
+    showApp();
+    await loadConversations();
+
+    if(state.poll)clearInterval(state.poll);
+    state.poll=setInterval(loadConversations,5000);
+  }catch(error){
+    errorEl.textContent=error.message || "Login failed.";
+  }finally{
+    button.disabled=false;
+    button.textContent="Sign in";
+  }
 });
 document.getElementById("logoutBtn").onclick=async function(){await fetch("/api/admin/logout",{method:"POST"});location.reload();};
 document.querySelectorAll(".filter").forEach(function(button){button.onclick=function(){state.filter=button.dataset.filter;document.querySelectorAll(".filter").forEach(function(b){b.classList.toggle("active",b===button);});renderConversations();};});
