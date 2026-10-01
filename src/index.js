@@ -1,12 +1,39 @@
 import { handleIncoming } from "./bot.js";
-import { claimMessage, updateSession } from "./store.js";
+import {
+  claimMessage,
+  getSession,
+  updateSession,
+  recordConversationMessage,
+  listConversations,
+  getConversation,
+  getConversationMessages,
+  setConversationState,
+  markConversationRead
+} from "./store.js";
 import { markAsRead, sendText } from "./whatsapp.js";
+import {
+  adminPage,
+  adminConfigured,
+  createAdminSession,
+  getAdminFromRequest,
+  adminSessionCookie,
+  clearAdminSessionCookie
+} from "./admin.js";
 
-function json(data,status=200){
+function json(data,status=200,headers={}){
   return new Response(JSON.stringify(data,null,2),{
     status,
-    headers:{"content-type":"application/json; charset=utf-8"}
+    headers:{
+      "content-type":"application/json; charset=utf-8",
+      "cache-control":"no-store",
+      ...headers
+    }
   });
+}
+
+async function readJson(request){
+  try{return await request.json();}
+  catch{return {};}
 }
 
 function constantTimeEqual(a,b){
@@ -66,6 +93,27 @@ function extractIncoming(body){
   return items;
 }
 
+function inboundDisplayText(message){
+  if(!message) return "Unsupported message";
+  if(message.type==="text") return message.text?.body || "";
+  if(message.type==="interactive"){
+    return message.interactive?.list_reply?.title
+      || message.interactive?.button_reply?.title
+      || message.interactive?.list_reply?.id
+      || message.interactive?.button_reply?.id
+      || "Interactive reply";
+  }
+  if(message.type==="button") return message.button?.text || message.button?.payload || "Button reply";
+  if(message.type==="image") return message.image?.caption || "📷 Image";
+  if(message.type==="video") return message.video?.caption || "🎥 Video";
+  if(message.type==="audio") return "🎵 Audio message";
+  if(message.type==="document") return `📎 ${message.document?.filename || "Document"}`;
+  if(message.type==="sticker") return "Sticker";
+  if(message.type==="location") return "📍 Location";
+  if(message.type==="contacts") return "Contact card";
+  return `[${message.type || "message"}]`;
+}
+
 async function processIncoming(env,item){
   const {message,from,profileName}=item;
 
@@ -76,9 +124,23 @@ async function processIncoming(env,item){
 
   if(!claimed) return;
 
-  await updateSession(env,from,{
+  const session=await updateSession(env,from,{
     ...(profileName?{name:profileName}:{}),
     lastSeenAt:new Date().toISOString()
+  });
+
+  const humanActive=
+    session.botMode==="human"
+    || (session.humanHandoffUntil && new Date(session.humanHandoffUntil).getTime()>Date.now());
+
+  await recordConversationMessage(env,{
+    phone:from,
+    customerName:profileName,
+    direction:"in",
+    source:"customer",
+    messageType:message.type || "unknown",
+    text:inboundDisplayText(message),
+    incrementUnread:Boolean(humanActive)
   });
 
   await markAsRead(env,message.id);
@@ -150,6 +212,172 @@ async function handleWebhookEvent(request,env,ctx){
   return new Response("EVENT_RECEIVED",{status:200});
 }
 
+async function requireAdmin(request,env){
+  const admin=await getAdminFromRequest(request,env);
+  return admin;
+}
+
+async function handleAdminApi(request,env,url){
+  if(url.pathname==="/api/admin/login" && request.method==="POST"){
+    if(!adminConfigured(env)){
+      return json({
+        error:"Admin inbox is not configured. Add ADMIN_USERS and ADMIN_SESSION_SECRET as Cloudflare secrets."
+      },503);
+    }
+
+    const body=await readJson(request);
+    const username=String(body.username || "").trim();
+    const password=String(body.password || "");
+    const token=await createAdminSession(env,username,password);
+
+    if(!token) return json({error:"Invalid username or password."},401);
+
+    return json(
+      {ok:true,username},
+      200,
+      {"set-cookie":adminSessionCookie(token)}
+    );
+  }
+
+  if(url.pathname==="/api/admin/logout" && request.method==="POST"){
+    return json(
+      {ok:true},
+      200,
+      {"set-cookie":clearAdminSessionCookie()}
+    );
+  }
+
+  const admin=await requireAdmin(request,env);
+  if(!admin) return json({error:"Unauthorized"},401);
+
+  if(url.pathname==="/api/admin/me" && request.method==="GET"){
+    return json({ok:true,username:admin.username});
+  }
+
+  if(!env.BOT_STATE){
+    return json({
+      error:"BOT_STATE KV is not connected. Add the BOT_STATE KV binding to use the admin inbox."
+    },503);
+  }
+
+  if(url.pathname==="/api/admin/conversations" && request.method==="GET"){
+    const conversations=await listConversations(env,{limit:300});
+    return json({ok:true,conversations});
+  }
+
+  const match=url.pathname.match(/^\/api\/admin\/conversations\/([^/]+)(?:\/(assign|takeover|return-to-bot|close|reply|read))?$/);
+  if(!match) return json({error:"Not found"},404);
+
+  const phone=decodeURIComponent(match[1]);
+  const action=match[2] || null;
+
+  if(!action && request.method==="GET"){
+    const [conversation,messages]=await Promise.all([
+      getConversation(env,phone),
+      getConversationMessages(env,phone,{limit:250})
+    ]);
+    return json({ok:true,conversation,messages});
+  }
+
+  if(request.method!=="POST") return json({error:"Method not allowed"},405);
+
+  if(action==="read"){
+    const conversation=await markConversationRead(env,phone);
+    return json({ok:true,conversation});
+  }
+
+  if(action==="assign"){
+    const conversation=await setConversationState(env,phone,{
+      assignedAdmin:admin.username,
+      status:"open"
+    });
+    return json({ok:true,conversation});
+  }
+
+  if(action==="takeover"){
+    await updateSession(env,phone,{
+      botMode:"human",
+      humanHandoffUntil:null
+    });
+
+    const conversation=await setConversationState(env,phone,{
+      botMode:"human",
+      needsHuman:true,
+      assignedAdmin:admin.username,
+      status:"open"
+    });
+
+    return json({ok:true,conversation});
+  }
+
+  if(action==="return-to-bot"){
+    await updateSession(env,phone,{
+      botMode:"bot",
+      humanHandoffUntil:null,
+      quoteDraft:null,
+      supportDraft:null
+    });
+
+    const conversation=await setConversationState(env,phone,{
+      botMode:"bot",
+      needsHuman:false,
+      assignedAdmin:null,
+      status:"open",
+      unreadCount:0
+    });
+
+    return json({ok:true,conversation});
+  }
+
+  if(action==="close"){
+    await updateSession(env,phone,{
+      botMode:"bot",
+      humanHandoffUntil:null,
+      quoteDraft:null,
+      supportDraft:null
+    });
+
+    const conversation=await setConversationState(env,phone,{
+      botMode:"bot",
+      needsHuman:false,
+      assignedAdmin:admin.username,
+      status:"closed",
+      unreadCount:0
+    });
+
+    return json({ok:true,conversation});
+  }
+
+  if(action==="reply"){
+    const body=await readJson(request);
+    const text=String(body.text || "").trim();
+    if(!text) return json({error:"Reply text is required."},400);
+    if(text.length>4000) return json({error:"Reply is too long."},400);
+
+    await updateSession(env,phone,{
+      botMode:"human",
+      humanHandoffUntil:null
+    });
+
+    await setConversationState(env,phone,{
+      botMode:"human",
+      needsHuman:true,
+      assignedAdmin:admin.username,
+      status:"open"
+    });
+
+    await sendText(env,phone,text,{
+      source:"admin",
+      adminName:admin.username
+    });
+
+    const conversation=await getConversation(env,phone);
+    return json({ok:true,conversation});
+  }
+
+  return json({error:"Unknown action"},404);
+}
+
 export default {
   async fetch(request,env,ctx){
     const url=new URL(request.url);
@@ -160,7 +388,8 @@ export default {
         service:"Skill Forge Academy WhatsApp Bot",
         runtime:"Cloudflare Workers",
         webhook:"/webhook",
-        health:"/health"
+        health:"/health",
+        admin:"/admin"
       });
     }
 
@@ -171,8 +400,24 @@ export default {
         kvBound:Boolean(env.BOT_STATE),
         whatsappConfigured:Boolean(env.WHATSAPP_ACCESS_TOKEN && env.WHATSAPP_PHONE_NUMBER_ID),
         webhookVerifyTokenConfigured:Boolean(env.WHATSAPP_VERIFY_TOKEN),
-        appSecretConfigured:Boolean(env.META_APP_SECRET)
+        appSecretConfigured:Boolean(env.META_APP_SECRET),
+        adminConfigured:adminConfigured(env)
       });
+    }
+
+    if(url.pathname==="/admin" && request.method==="GET"){
+      return new Response(adminPage(),{
+        headers:{
+          "content-type":"text/html; charset=utf-8",
+          "cache-control":"no-store",
+          "x-frame-options":"DENY",
+          "content-security-policy":"default-src 'self'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'self'; img-src 'self' data:; frame-ancestors 'none'; base-uri 'none'"
+        }
+      });
+    }
+
+    if(url.pathname.startsWith("/api/admin/")){
+      return handleAdminApi(request,env,url);
     }
 
     if(url.pathname==="/webhook" && request.method==="GET"){
