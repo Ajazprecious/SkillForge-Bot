@@ -19,7 +19,8 @@ import {
   getSession,
   updateSession,
   saveLead,
-  saveQuoteRequest
+  saveQuoteRequest,
+  setConversationState
 } from "./store.js";
 
 const MENU_WORDS=new Set(["menu","main menu","home","0","start"]);
@@ -166,6 +167,7 @@ async function startQuoteRequest(env,to,profileName,service=null){
     quoteDraft,
     supportDraft:null,
     humanHandoffUntil:null,
+    botMode:"bot",
     lastIntent:"quote_request"
   });
 
@@ -299,8 +301,27 @@ async function handleQuoteDraft(env,to,profileName,rawText,session){
       quoteDraft:null,
       supportDraft:null,
       humanHandoffUntil:until.toISOString(),
+      botMode:"human",
       lastIntent:"quote_handoff",
       name:data.name
+    });
+
+    await setConversationState(env,to,{
+      status:"open",
+      botMode:"human",
+      needsHuman:true,
+      unreadCount:1,
+      supportType:"quote",
+      reference:quote.id,
+      customerName:data.name,
+      latestRequest:{
+        type:"quote",
+        service:data.service || "General digital service",
+        description:data.description,
+        budget:data.budget,
+        timeline:data.timeline,
+        reference:quote.id
+      }
     });
 
     await sendText(
@@ -320,6 +341,7 @@ async function startHumanSupport(env,to,profileName){
     },
     quoteDraft:null,
     humanHandoffUntil:null,
+    botMode:"bot",
     lastIntent:"human_support_request"
   });
 
@@ -363,8 +385,24 @@ async function handleSupportDraft(env,to,profileName,rawText){
     supportDraft:null,
     quoteDraft:null,
     humanHandoffUntil:until.toISOString(),
+    botMode:"human",
     lastIntent:"human_handoff",
     name:profileName || null
+  });
+
+  await setConversationState(env,to,{
+    status:"open",
+    botMode:"human",
+    needsHuman:true,
+    unreadCount:1,
+    supportType:"human_support",
+    reference:lead.id,
+    customerName:profileName || null,
+    latestRequest:{
+      type:"human_support",
+      message:text,
+      reference:lead.id
+    }
   });
 
   await sendText(
@@ -390,9 +428,16 @@ async function handleCommand(env,to,command,profileName,originalText){
   if(command==="menu_main"){
     await updateSession(env,to,{
       humanHandoffUntil:null,
+      botMode:"bot",
       quoteDraft:null,
       supportDraft:null,
       lastIntent:"menu"
+    });
+    await setConversationState(env,to,{
+      status:"open",
+      botMode:"bot",
+      needsHuman:false,
+      assignedAdmin:null
     });
     return safeMenu(env,to);
   }
@@ -512,6 +557,10 @@ export async function handleIncoming(env,{from,profileName,message}){
       lastIntent:"menu"
     });
     await safeMenu(env,from);
+    return;
+  }
+
+  if(session.botMode==="human"){
     return;
   }
 
