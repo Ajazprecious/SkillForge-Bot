@@ -233,7 +233,7 @@ async function handleAdminApi(request,env,url){
     if(!token) return json({error:"Invalid username or password."},401);
 
     return json(
-      {ok:true,username},
+      {ok:true,username,token},
       200,
       {"set-cookie":adminSessionCookie(token)}
     );
