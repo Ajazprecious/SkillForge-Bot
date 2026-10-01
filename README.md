@@ -16,7 +16,7 @@ The bot no longer needs Express, MongoDB, a long-running Node server, or Render.
 - STOP/unsubscribe and START BOT/resume
 - Duplicate-message protection
 - Meta webhook signature verification
-- Optional Cloudflare KV persistence
+- Cloudflare KV conversation persistence
 - Health endpoint for setup checks
 
 ## Repository structure
@@ -182,6 +182,68 @@ CANCEL
 ```
 
 to cancel the request.
+
+## Admin support inbox
+
+The Worker now includes a multi-admin support dashboard at:
+
+```text
+https://YOUR-WORKER.workers.dev/admin
+```
+
+The dashboard lets admins:
+
+- see customer conversations
+- see quote and human-support requests
+- see unread messages
+- assign a conversation to themselves
+- take over a conversation from the bot
+- reply to the customer from the main Skill Forge WhatsApp number
+- return a conversation to the bot
+- close a conversation
+- search conversations
+- work simultaneously with other admins
+
+### Required Cloudflare secrets
+
+Add these under **Worker → Settings → Variables and Secrets**:
+
+```text
+ADMIN_USERS
+ADMIN_SESSION_SECRET
+```
+
+`ADMIN_USERS` must be a JSON object containing each admin username and password. Example:
+
+```json
+{"precious":"replace-with-a-strong-password","admin2":"replace-with-another-strong-password"}
+```
+
+Store it as a Cloudflare **Secret**, not in GitHub.
+
+`ADMIN_SESSION_SECRET` should be a long random private string, for example:
+
+```text
+SkillForgeAdminSession_2026_change_this_to_a_long_random_value
+```
+
+Store that as a Cloudflare **Secret** too.
+
+The dashboard requires the existing KV binding:
+
+```text
+BOT_STATE
+```
+
+If `BOT_STATE` is not connected, the dashboard cannot persist conversations.
+
+### How human takeover works
+
+When a customer completes **Human Support** or a **Quote Request**, that customer's conversation switches to human mode. The bot stops responding to that person while all other customers continue using the bot normally.
+
+An admin can open the dashboard, click **Assign to me** or **Take over**, and reply directly. The reply is sent through the WhatsApp Cloud API from the Skill Forge WhatsApp number.
+
+When the admin finishes, click **Return to bot** or **Close**. The customer's automated bot access resumes.
 
 ## Local development
 
