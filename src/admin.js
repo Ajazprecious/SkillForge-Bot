@@ -198,7 +198,11 @@ var state={admin:null,conversations:[],selected:null,filter:"all",poll:null};
 
 function esc(value){
   return String(value==null?"":value).replace(/[&<>"']/g,function(c){
-    return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c];
+    if(c==="&") return "&amp;";
+    if(c==="<") return "&lt;";
+    if(c===">") return "&gt;";
+    if(c.charCodeAt(0)===34) return "&quot;";
+    return "&#39;";
   });
 }
 function formatTime(value){
